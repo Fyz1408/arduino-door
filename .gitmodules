@@ -1,0 +1,3 @@
+[submodule "lib/sram"]
+	path = lib/sram
+	url = https://github.com/ennui2342/arduino-sram.git
