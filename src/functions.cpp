@@ -54,6 +54,7 @@ void reconnect() {
 void verifyCard(String uid) {
     int foundIndex = -1;
 
+    // TODO Dont hardcode allowed key cards
     for (int i = 0; i < 2; i++) {
         if (allowedCards[i] == uid) {
             foundIndex = i;
@@ -66,10 +67,17 @@ void verifyCard(String uid) {
         Serial.print("Card found at index: ");
         Serial.println(foundIndex);
         lcd.print("Card found!");
+
+        String message = "Card-allowed: " + uid;
+        client.publish("/mqtt", message.c_str());
+
         lcd.setRGB(0, 255, 0); // Display green
     } else {
         Serial.println("Card not found in the array.");
         lcd.print("Card not allowed");
+
+        String message = "Card-denied: " + uid;
+        client.publish("/mqtt", message.c_str());
         lcd.setRGB(255, 0, 0); // Display red
     }
 }

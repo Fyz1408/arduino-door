@@ -1,3 +1,6 @@
 [submodule "lib/sram"]
 	path = lib/sram
 	url = https://github.com/ennui2342/arduino-sram.git
+[submodule "lib/keypad"]
+	path = lib/keypad
+	url = https://github.com/Chris--A/Keypad.git
