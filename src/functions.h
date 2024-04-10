@@ -10,5 +10,6 @@ void verifyCard(String uid);
 
 // LCD
 void printAndDisplay(String text);
+void resetDisplayToDefault();
 
 #endif

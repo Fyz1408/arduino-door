@@ -13,7 +13,7 @@ extern byte mac[];
 extern IPAddress ip;
 extern PubSubClient client;
 extern rgb_lcd lcd;
-extern String allowedCards[];
+extern String allowedCards[1];
 
 void setupEthernet() {
     Serial.print("Connecting to ethernet ");
@@ -55,7 +55,7 @@ void verifyCard(String uid) {
     int foundIndex = -1;
 
     // TODO Dont hardcode allowed key cards
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < sizeof(allowedCards); i++) {
         if (allowedCards[i] == uid) {
             foundIndex = i;
             break;
@@ -64,21 +64,18 @@ void verifyCard(String uid) {
 
     lcd.clear();
     if (foundIndex != -1) {
-        Serial.print("Card found at index: ");
-        Serial.println(foundIndex);
-        lcd.print("Card found!");
+        lcd.setRGB(0, 255, 0); // Display green
+        printAndDisplay("Card allowed");
 
-        String message = "Card-allowed: " + uid;
+        String message = "Card-entered: " + uid;
         client.publish("/mqtt", message.c_str());
 
-        lcd.setRGB(0, 255, 0); // Display green
     } else {
-        Serial.println("Card not found in the array.");
-        lcd.print("Card not allowed");
+        lcd.setRGB(255, 0, 0); // Display red
+        printAndDisplay("Card not allowed");
 
         String message = "Card-denied: " + uid;
         client.publish("/mqtt", message.c_str());
-        lcd.setRGB(255, 0, 0); // Display red
     }
 }
 
@@ -86,4 +83,13 @@ void printAndDisplay(String text) {
     lcd.clear();
     lcd.print(text);
     Serial.println(text);
+}
+
+void resetDisplayToDefault() {
+    lcd.clear();
+    lcd.setRGB(255, 255, 255);
+    lcd.setCursor(0, 0);
+    lcd.print("Enter the pin or");
+    lcd.setCursor(0, 1);
+    lcd.print("scan your card");
 }
