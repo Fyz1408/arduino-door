@@ -5,8 +5,8 @@
 void setupEthernet();
 void reconnect();
 
-// RFID Cards
-void verifyCard(String uid);
+// Verify card or pin using MQTT
+void verify(String code, String type);
 
 // LCD
 void printAndDisplay(String text);

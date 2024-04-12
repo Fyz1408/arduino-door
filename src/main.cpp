@@ -7,14 +7,12 @@
 #include <Keypad.h>
 #include "functions.h"
 #include "rgb_lcd.h"
-
-// Temp array with allowed cards
-String allowedCards[] = {"4be8eff", "928a3dbf"};
+#include "secrets.h"
 
 // Mac, arduino IP and server IP
-byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
-IPAddress ip(192, 168, 1, 3);
-IPAddress server(192, 168, 1, 139);
+byte mac[] = {MAC};
+IPAddress ip(IP_OCTETS);
+IPAddress server(SERVER_OCTETS);
 
 // Ethernet and PubSubClient
 SRAM sram(4, SRAM_1024);
@@ -23,16 +21,14 @@ PubSubClient client(ethClient);
 
 // LCD and RFID scanner
 rgb_lcd lcd;
-MFRC522 mfrc522(0x28);
+MFRC522 mfrc522(LCD);
 
-byte row_pins[] = {2, 3, 4, 5}; // Row pins of the keypad
-byte column_pins[] = {6, 7, 8, 9}; // Column pins of the keypad
+// Keypad row & column pins
+byte row_pins[] = {2, 3, 4, 5};
+byte column_pins[] = {6, 7, 8, 9};
 
-void connectClient();
-void keypad(char keypress);
-void scanCard();
 
-// Declaration of the keys of the keypad
+// Set the keys of the keypad
 char hexaKeys[sizeof(row_pins) / sizeof(byte)][sizeof(column_pins) / sizeof(byte)] =
         {
                 {'1', '2', '3', 'A'},
@@ -41,16 +37,21 @@ char hexaKeys[sizeof(row_pins) / sizeof(byte)][sizeof(column_pins) / sizeof(byte
                 {'0', 'F', 'E', 'D'}
         };
 
+// The object for the keypad
 Keypad kypd = Keypad(makeKeymap(hexaKeys),
                      row_pins,
                      column_pins,
                      sizeof(row_pins) / sizeof(byte),
                      sizeof(column_pins) / sizeof(byte)
-); // Define object for the keypad
+);
 
+// Variables to keep track of keypresses and pressed code
 int keypresses = 0;
 String pressedCode;
 
+void connectClient();
+void keypad(char keypress);
+void scanCard();
 
 void setup() {
     Serial.begin(9600);
@@ -62,16 +63,10 @@ void setup() {
     mfrc522.PCD_Init();
     client.setServer(server, 1883);
     setupEthernet();
-
-    printAndDisplay("Setup done");
-    delay(1000);
-    lcd.clear();
-    resetDisplayToDefault();
+    connectClient();
 }
 
 void loop() {
-    connectClient();
-
     char current_key = kypd.getKey();
 
     if (current_key != 0 ) {
@@ -94,25 +89,17 @@ void keypad(char keypress) {
         keypresses++;
 
         switch (keypress) {
-            case 'C':
-                printAndDisplay("Clearing..");
+            case 'E':
+                printAndDisplay("Exiting..");
                 keypresses = 0;
                 pressedCode = "";
-                delay(1000);
+                delay(700);
                 resetDisplayToDefault();
                 break;
             case 'D':
                 printAndDisplay("Submitting: " + pressedCode);
-                delay(700);
-                // TODO Temporray placeholder code
-                if (pressedCode == "123") {
-                    printAndDisplay("Correct!");
-                    lcd.setRGB(0, 255, 0);
-                } else {
-                    printAndDisplay("Wrong code");
-                    lcd.setRGB(255, 0, 0);
-                }
-                delay(1000);
+                verify(pressedCode, "pin");
+                delay(600);
                 keypresses = 0;
                 pressedCode = "";
                 resetDisplayToDefault();
@@ -120,14 +107,15 @@ void keypad(char keypress) {
             default:
                 pressedCode += String(keypress);
                 if (keypresses == 17) {
-                    lcd.setCursor(0, 1);
-                } else if (keypresses == 33) {
                     keypresses = 0;
                     lcd.clear();
                     lcd.setCursor(0, 0);
                 }
                 Serial.println("Keypressed: " + String(keypress));
                 lcd.print(String(keypress));
+                lcd.setCursor(0, 1);
+                lcd.print("Send D | Exit E");
+                lcd.setCursor(keypresses, 0);
         }
     }
 }
@@ -148,15 +136,15 @@ void scanCard() {
     }
 
     keypresses = 0;
-    String uidBytes = "";
+    String uidBytes;
+
     for (byte i = 0; i < mfrc522.uid.size; i++) {
         // Save card uid
         uidBytes += String(mfrc522.uid.uidByte[i], HEX);
     }
 
-    Serial.println(uidBytes);
-    verifyCard(uidBytes);
-
-    delay(1000);
-    resetDisplayToDefault();
+    printAndDisplay("Verifying..");
+    lcd.setRGB(255, 255, 0);
+    delay(450);
+    verify(uidBytes, "card");
 }
