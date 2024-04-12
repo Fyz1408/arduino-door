@@ -66,15 +66,16 @@ void handleCallback(char *topic, byte *payload, unsigned int length) {
     Serial.print(topic);
     Serial.print("| Payload: ");
 
+    // Since payload is byte we need to for loop through it
     for (int i = 0; i < length; i++) {
         Serial.println((char) payload[i]);
 
         if ((char) payload[i] == '1') {
-            printAndDisplay("Door opening");
+            printAndDisplay("Door opening..");
             Serial.println("\n");
             lcd.setRGB(0, 255, 0);
         } else {
-            printAndDisplay("No entry");
+            printAndDisplay("No entry!");
             Serial.println("\n");
             lcd.setRGB(255, 0, 0);
         }
@@ -90,6 +91,7 @@ void verify(String code, String type) {
     char message[50] = {0};
     char returnAddress[50] = {0};
 
+    // Setup topic either for pin code or keycard
     if (type == "pin") {
         strcat(topic, "/mqtt/room/doors/4/pin");
     } else if (type == "card") {
@@ -98,13 +100,16 @@ void verify(String code, String type) {
         Serial.println("No type choosen");
     }
 
+    // Create return address from topic
     strcat(returnAddress, topic);
     strcat(returnAddress, "/return");
 
+    // Create message to publish
     strcat(message, code.c_str());
     strcat(message, "+");
     strcat(message, returnAddress);
 
+    // Publish message and setup callback to handle response from server
     client.publish(topic, message);
     client.subscribe(returnAddress);
     client.setCallback(handleCallback);

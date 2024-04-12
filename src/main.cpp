@@ -69,7 +69,7 @@ void setup() {
 void loop() {
     char current_key = kypd.getKey();
 
-    if (current_key != 0 ) {
+    if (current_key != 0) {
         keypad(current_key);
     } else {
         scanCard();
@@ -79,6 +79,12 @@ void loop() {
     client.loop();
 }
 
+void connectClient() {
+    // Connect to MQTT
+    reconnect();
+    resetDisplayToDefault();
+    delay(400);
+}
 
 void keypad(char keypress) {
     if (keypresses == 0) {
@@ -90,6 +96,7 @@ void keypad(char keypress) {
 
         switch (keypress) {
             case 'E':
+                // Reset display, pressed code & keypresses
                 printAndDisplay("Exiting..");
                 keypresses = 0;
                 pressedCode = "";
@@ -97,14 +104,23 @@ void keypad(char keypress) {
                 resetDisplayToDefault();
                 break;
             case 'D':
-                printAndDisplay("Submitting: " + pressedCode);
+                // Display to user we are verifying
+                printAndDisplay("Verifying: " + pressedCode);
+                lcd.setCursor(0, 1);
+                lcd.print("Abort with E");
+                lcd.setRGB(255, 255, 0);
+                delay(450);
+
+                // Verify entered pin
                 verify(pressedCode, "pin");
                 delay(600);
+
+                // Reset back to default after verify pin
                 keypresses = 0;
                 pressedCode = "";
-                resetDisplayToDefault();
                 break;
             default:
+                // Store keypress for later submit
                 pressedCode += String(keypress);
                 if (keypresses == 17) {
                     keypresses = 0;
@@ -120,21 +136,12 @@ void keypad(char keypress) {
     }
 }
 
-void connectClient() {
-    if (!client.connected()) {
-        reconnect();
-        lcd.clear();
-        resetDisplayToDefault();
-        delay(400);
-    }
-}
-
 void scanCard() {
+    // Return if no new card is present or getting read
     if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) {
         delay(50);
         return;
     }
-
     keypresses = 0;
     String uidBytes;
 
@@ -143,8 +150,13 @@ void scanCard() {
         uidBytes += String(mfrc522.uid.uidByte[i], HEX);
     }
 
+    // Display to user were verifying
     printAndDisplay("Verifying..");
+    lcd.setCursor(0, 1);
+    lcd.print("Abort with E");
     lcd.setRGB(255, 255, 0);
     delay(450);
+
+    // Verify card
     verify(uidBytes, "card");
 }
