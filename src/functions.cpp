@@ -31,6 +31,13 @@ void setupEthernet() {
     }
 }
 
+// Serial and LCD print text
+void printAndDisplay(String text) {
+    lcd.clear();
+    lcd.print(text);
+    Serial.println(text);
+}
+
 // Reconnect to our main unit over MQTT
 void reconnect() {
     int attempts = 0;
@@ -39,11 +46,13 @@ void reconnect() {
         if (attempts < 5) {
             Serial.println("Attempting MQTT connection...");
             // Attempt to connect
-            if (client.connect("doorClient")) {
-                printAndDisplay("MQTT Connected");
-                printAndDisplay("Setup done\n");
+            if (client.connect("doorClient", MQTT_USER, MQTT_PASS)) {
+                // Tell user were connected
+                Serial.println("MQTT Connected");
+                lcd.print("MQTT Connected");
                 delay(500);
-                resetDisplayToDefault();
+                Serial.println("Setup done");
+                lcd.print("Setup done");
                 // Once connected, publish an announcement...
                 client.publish("/mqtt/", "Door arduino connected");
             } else {
@@ -93,9 +102,9 @@ void verify(String code, String type) {
 
     // Setup topic either for pin code or keycard
     if (type == "pin") {
-        strcat(topic, "/mqtt/room/doors/4/pin");
+        strcat(topic, "/mqtt/room/doors/3/pin");
     } else if (type == "card") {
-        strcat(topic, "/mqtt/room/doors/3/keycard");
+        strcat(topic, "/mqtt/room/doors/2/keycard");
     } else {
         Serial.println("No type choosen");
     }
@@ -105,6 +114,7 @@ void verify(String code, String type) {
     strcat(returnAddress, "/return");
 
     // Create message to publish
+    strcat(message, "!");
     strcat(message, code.c_str());
     strcat(message, "+");
     strcat(message, returnAddress);
@@ -115,13 +125,6 @@ void verify(String code, String type) {
     client.setCallback(handleCallback);
 }
 
-// Serial and LCD print text
-void printAndDisplay(String text) {
-    lcd.clear();
-    lcd.print(text);
-    Serial.println(text);
-}
-
 // Reset LCD display to default ready to receive pin or card
 void resetDisplayToDefault() {
     lcd.clear();
@@ -130,4 +133,5 @@ void resetDisplayToDefault() {
     lcd.print("Enter the pin or");
     lcd.setCursor(0, 1);
     lcd.print("scan your card");
+    Serial.println("Enter the pin or scan your card");
 }

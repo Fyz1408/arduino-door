@@ -45,7 +45,7 @@ Keypad kypd = Keypad(makeKeymap(hexaKeys),
                      sizeof(column_pins) / sizeof(byte)
 );
 
-// Variables to keep track of keypresses and pressed code
+// Variables to keep track of keypress count, code & last scanned card
 int keypresses = 0;
 String pressedCode;
 
