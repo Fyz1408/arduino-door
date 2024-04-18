@@ -5,7 +5,6 @@
 #include <PubSubClient.h>
 #include <SRAM.h>
 #include <Keypad.h>
-#include "functions.h"
 #include "rgb_lcd.h"
 #include "secrets.h"
 
@@ -21,7 +20,7 @@ PubSubClient client(ethClient);
 
 // LCD and RFID scanner
 rgb_lcd lcd;
-MFRC522 mfrc522(LCD);
+MFRC522 mfrc522(RFID);
 
 // Keypad row & column pins
 byte row_pins[] = {2, 3, 4, 5};
@@ -49,9 +48,18 @@ Keypad kypd = Keypad(makeKeymap(hexaKeys),
 int keypresses = 0;
 String pressedCode;
 
+// Ethernet & MQTT
+void setupEthernet();
 void connectClient();
+void handleCallback(char *topic, byte *payload, unsigned int length);
+
+// Verification of keypress & card scans
+void verify(String code, String type);
 void keypad(char keypress);
 void scanCard();
+
+// LCD
+void resetDisplayToDefault();
 
 void setup() {
     Serial.begin(9600);
@@ -69,6 +77,7 @@ void setup() {
 void loop() {
     char current_key = kypd.getKey();
 
+    // Keypress or scan card
     if (current_key != 0) {
         keypad(current_key);
     } else {
@@ -79,9 +88,35 @@ void loop() {
     client.loop();
 }
 
+// Connect to our main unit over MQTT
 void connectClient() {
-    // Connect to MQTT
-    reconnect();
+    int attempts = 0;
+    // Loop until we're reconnected
+    while (!client.connected()) {
+        if (attempts < 5) {
+            Serial.println(F("Attempting MQTT connection..."));
+            // Attempt to connect
+            if (client.connect("doorClient", MQTT_USER, MQTT_PASS)) {
+                // Display were connected via MQTT
+                Serial.println(F("MQTT Connected \nSetup done"));
+                lcd.print("MQTT Connected");
+                delay(500);
+                lcd.print("Setup done");
+
+                // Once connected do a little test publish
+                client.publish("/mqtt/", "Door arduino connected");
+            } else {
+                Serial.print(F("failed, rc="));
+                // Wait 5 seconds before retrying
+                delay(5000);
+                attempts++;
+            }
+        } else {
+            Serial.print(F("MQTT failed"));
+            break;
+        }
+    }
+
     resetDisplayToDefault();
     delay(400);
 }
@@ -97,7 +132,9 @@ void keypad(char keypress) {
         switch (keypress) {
             case 'E':
                 // Reset display, pressed code & keypresses
-                printAndDisplay("Exiting..");
+                lcd.clear();
+                lcd.print("Exiting..");
+                Serial.println("Exiting..");
                 keypresses = 0;
                 pressedCode = "";
                 delay(700);
@@ -105,7 +142,9 @@ void keypad(char keypress) {
                 break;
             case 'D':
                 // Display to user we are verifying
-                printAndDisplay("Verifying: " + pressedCode);
+                lcd.clear();
+                lcd.print("Verifying: " + pressedCode);
+                Serial.println("Verifying: " + pressedCode);
                 lcd.setCursor(0, 1);
                 lcd.print("Abort with E");
                 lcd.setRGB(255, 255, 0);
@@ -151,7 +190,9 @@ void scanCard() {
     }
 
     // Display to user were verifying
-    printAndDisplay("Verifying..");
+    Serial.println("Verifying...");
+    lcd.clear();
+    lcd.print("Verifying..");
     lcd.setCursor(0, 1);
     lcd.print("Abort with E");
     lcd.setRGB(255, 255, 0);
@@ -159,4 +200,87 @@ void scanCard() {
 
     // Verify card
     verify(uidBytes, "card");
+}
+
+// Initialize ethernet and connect to it
+void setupEthernet() {
+    Serial.println(F("Connecting to ethernet"));
+    Ethernet.init(10);
+    Ethernet.begin(mac, ip);
+
+    // Check for Ethernet hardware present
+    if (Ethernet.hardwareStatus() == EthernetNoHardware) {
+        Serial.println(F("Ethernet shield was not found"));
+        return;
+    }
+    if (Ethernet.linkStatus() == LinkOFF) {
+        Serial.println(F("Ethernet cable is not connected."));
+    }
+}
+
+
+void handleCallback(char *topic, byte *payload, unsigned int length) {
+    Serial.print("Response: ");
+
+    // Since payload is byte we need to for loop through it
+    for (int i = 0; i < length; i++) {
+        Serial.println((char) payload[i]);
+
+        if ((char) payload[i] == '1') {
+            lcd.clear();
+            lcd.print("Door opening..");
+            Serial.println("Door opening..");
+            lcd.setRGB(0, 255, 0);
+        } else {
+            lcd.clear();
+            lcd.print("No entry!");
+            Serial.println("No entry!");
+            lcd.setRGB(255, 0, 0);
+        }
+    }
+
+    delay(1000);
+    resetDisplayToDefault();
+}
+
+// Verify a card or entered pin over MQTT
+void verify(String code, String type) {
+    char topic[30] = {0};
+    char message[50] = {0};
+    char returnAddress[50] = {0};
+
+    // Setup topic either for pin code or keycard
+    if (type == "pin") {
+        strcat(topic, "/mqtt/room/doors/3/pin");
+    } else if (type == "card") {
+        strcat(topic, "/mqtt/room/doors/2/keycard");
+    } else {
+        Serial.println(F("No type choosen"));
+    }
+
+    // Create return address from topic
+    strcat(returnAddress, topic);
+    strcat(returnAddress, "/return");
+
+    // Create message to publish
+    strcat(message, "!");
+    strcat(message, code.c_str());
+    strcat(message, "+");
+    strcat(message, returnAddress);
+
+    // Publish message and setup callback to handle response from server
+    client.publish(topic, message);
+    client.subscribe(returnAddress);
+    client.setCallback(handleCallback);
+}
+
+// Reset LCD display to default ready to receive pin or card
+void resetDisplayToDefault() {
+    lcd.clear();
+    lcd.setRGB(255, 255, 255);
+    lcd.setCursor(0, 0);
+    lcd.print("Enter the pin or");
+    lcd.setCursor(0, 1);
+    lcd.print("scan your card");
+    Serial.println("Enter the pin or scan your card");
 }
